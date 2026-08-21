@@ -2,6 +2,13 @@ const CAD_CATALOG_REFRESH_INTERVAL_MS = 2_000;
 const CAD_CATALOG_FETCH_TIMEOUT_MS = 10_000;
 const CAD_DIR_QUERY_PARAM = "dir";
 const CAD_FILE_QUERY_PARAM = "file";
+const CAD_TASK_QUERY_PARAM = "task";
+
+// Task mode: an opaque ?task=<taskId> share URL. The resolved absolute directory
+// lives ONLY here (in-memory) and is fed to /__cad/* as ?dir= — it is never written
+// back to the address bar, history, or shared links.
+let _taskDir = "";
+let _taskResolvePromise = null;
 
 function normalizeCadManifest(manifest) {
   if (!manifest || typeof manifest !== "object") {
@@ -96,6 +103,47 @@ function readSearchParam(name) {
   }
 }
 
+/** The opaque taskId of the current page, or "" when not in task mode. */
+export function readActiveTask() {
+  return readSearchParam(CAD_TASK_QUERY_PARAM);
+}
+
+/**
+ * Resolve ?task=<taskId> to its absolute uploads directory via the constrained
+ * server resolver (/__cad/resolve). The result is cached in memory ONLY — never
+ * in the URL. Resolves to "" when there is no task.
+ */
+export async function ensureTaskResolved() {
+  const task = readActiveTask();
+  if (!task) {
+    return "";
+  }
+  if (_taskDir) {
+    return _taskDir;
+  }
+  if (_taskResolvePromise) {
+    return _taskResolvePromise;
+  }
+  _taskResolvePromise = (async () => {
+    const url = `/__cad/resolve?${new URLSearchParams({ task }).toString()}`;
+    const response = await fetchWithTimeout(
+      url,
+      { cache: "no-store" },
+      CAD_CATALOG_FETCH_TIMEOUT_MS,
+      "Timed out resolving task"
+    );
+    if (!response.ok) {
+      throw new Error(await readJsonError(response, `Failed to resolve task ${response.status}`));
+    }
+    const payload = await response.json();
+    _taskDir = String(payload?.dir || "").trim();
+    return _taskDir;
+  })().finally(() => {
+    _taskResolvePromise = null;
+  });
+  return _taskResolvePromise;
+}
+
 /**
  * The directory the page is showing: the URL's PATH, exactly as in a file:// URL.
  *
@@ -109,6 +157,11 @@ function readSearchParam(name) {
 export function readActiveCadDir() {
   if (typeof window === "undefined") {
     return "";
+  }
+  // Task mode: the directory comes from the in-memory resolver cache, never from
+  // the URL (the URL only carries the opaque taskId). Empty until resolved.
+  if (readActiveTask()) {
+    return _taskDir;
   }
   let pathname = "";
   try {
@@ -132,7 +185,12 @@ function cadApiUrl(path, {
   params = {},
 } = {}) {
   const url = new URL(path, "http://cad.local");
-  if (activeDir) {
+  const task = readActiveTask();
+  if (task) {
+    // Task mode: drive reads by the opaque taskId (server resolves the dir);
+    // the absolute dir is never placed on the wire either.
+    url.searchParams.set(CAD_TASK_QUERY_PARAM, task);
+  } else if (activeDir) {
     url.searchParams.set(CAD_DIR_QUERY_PARAM, activeDir);
   }
   if (includeFile) {
@@ -327,11 +385,20 @@ if (typeof window !== "undefined") {
     });
   };
 
-  refreshCadCatalog().catch((error) => {
-    if (import.meta.env.DEV) {
-      console.warn("Failed to refresh CAD catalog", error);
-    }
-  });
+  // Resolve ?task= to its in-memory dir before the first catalog load (task mode).
+  ensureTaskResolved()
+    .catch((error) => {
+      if (import.meta.env.DEV) {
+        console.warn("Failed to resolve CAD task", error);
+      }
+    })
+    .finally(() => {
+      refreshCadCatalog().catch((error) => {
+        if (import.meta.env.DEV) {
+          console.warn("Failed to refresh CAD catalog", error);
+        }
+      });
+    });
 
   if (!refreshLoopStarted) {
     refreshLoopStarted = true;

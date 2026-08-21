@@ -257,7 +257,7 @@ import {
   URDF_JOINT_ANIMATION_FOLLOW_MS
 } from "cadjs/lib/urdf/jointAnimation";
 import { checkMoveIt2ServerLive, moveit2ServerEnabled, requestMoveIt2Server } from "cadjs/lib/urdf/moveit2ServerClient";
-import { readActiveCadDir, requestArtifactStatus } from "../workbench/cadManifestStore.js";
+import { readActiveCadDir, readActiveTask, requestArtifactStatus } from "../workbench/cadManifestStore.js";
 import {
   FILE_STATUS_LEVELS,
   buildFileStatusItems,
@@ -4575,7 +4575,11 @@ export default function CadWorkspace({
       return;
     }
     let cancelled = false;
-    const url = `/__cad/asset?file=${encodeURIComponent(featuresFileParam)}`;
+    // Task mode: ?features= is a task-relative name; drive the asset read by ?task=.
+    const activeTask = readActiveTask();
+    const url = activeTask && featuresFileParam && !/^([A-Za-z]:[\\/]|\/)/.test(featuresFileParam)
+      ? `/__cad/asset?task=${encodeURIComponent(activeTask)}&file=${encodeURIComponent(featuresFileParam)}`
+      : `/__cad/asset?file=${encodeURIComponent(featuresFileParam)}`;
     fetch(url)
       .then((response) => {
         if (!response.ok) {
