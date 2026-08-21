@@ -1,6 +1,29 @@
-import subprocess, time
+"""Benchmark STEP -> GLB via cadgen.step_artifact.
 
-PY = r"C:/Users/14418/.workbuddy/binaries/python/envs/cadgen/Scripts/python.exe"
+Usage:
+  python bench_step2glb.py [step_root]
+
+  step_root: directory of STEP files to convert (default: <repo>/step).
+             Overridable with $STEP_REPO_ROOT. The CAD Python is $CAD_PYTHON
+             (default: the .workbuddy cadgen venv).
+"""
+import os
+import subprocess
+import sys
+import time
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.dirname(SCRIPT_DIR)
+
+PY = os.environ.get(
+    "CAD_PYTHON",
+    r"C:/Users/14418/.workbuddy/binaries/python/envs/cadgen/Scripts/python.exe",
+)
+STEP_ROOT = (
+    os.environ.get("STEP_REPO_ROOT")
+    or (sys.argv[1] if len(sys.argv) > 1 else "")
+    or os.path.join(REPO_ROOT, "step")
+)
 FILES = [
     "GBAE03-03-02-02-A皮带支撑块.step",
     "TB62A01-G02-02-1A底部轴承座.STEP",
@@ -8,13 +31,17 @@ FILES = [
     "JA07D-16-162A1.step",
 ]
 
+print(f"repo_root: {REPO_ROOT}")
+print(f"step_root: {STEP_ROOT}")
+print(f"cad python: {PY}")
+
 for f in FILES:
     print(f"===== {f} =====")
     t0 = time.perf_counter()
     r = subprocess.run(
-        [PY, "-m", "cadgen.step_artifact", "--repo-root", "D:/14418/step-viewer/step", "--step", f, "--verbose"],
+        [PY, "-m", "cadgen.step_artifact", "--repo-root", STEP_ROOT, "--step", f, "--verbose"],
         capture_output=True, text=True, encoding="utf-8", errors="replace",
-        cwd="D:/14418/step-viewer/step",
+        cwd=STEP_ROOT,
     )
     elapsed = time.perf_counter() - t0
     for line in (r.stdout + r.stderr).splitlines():

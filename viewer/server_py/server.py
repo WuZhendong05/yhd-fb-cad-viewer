@@ -77,6 +77,15 @@ class _Ctx:
     debug = False
 
 
+def _is_loopback_host(host: str) -> bool:
+    """True for 127.0.0.0/8, localhost, and ::1 — the only safe bind targets for
+    this unauthenticated viewer outside an authenticated reverse proxy."""
+    value = str(host or "").strip().lower()
+    if value in ("localhost", "::1"):
+        return True
+    return value == "127.0.0.1" or value.startswith("127.")
+
+
 def _server_info(root_dir: str = "") -> dict:
     return server_info_mod.build_viewer_server_info(
         root_dir=root_dir or "",
@@ -393,6 +402,15 @@ def main(argv=None):
     _Ctx.port = server_info_mod.normalize_viewer_port(args.port)
     _Ctx.host = args.host
     _Ctx.debug = bool(args.debug)
+
+    if not _is_loopback_host(args.host):
+        print(
+            f"WARNING: binding to non-loopback host {args.host!r}. The CAD Viewer is "
+            "UNAUTHENTICATED and serves local files by URL path. Do not expose it "
+            "beyond a trusted network; put it behind an authenticated reverse proxy "
+            "for any external access.",
+            file=sys.stderr,
+        )
     _Ctx.backend = backend_mod.LocalAssetBackend()
 
     httpd = ThreadingHTTPServer((args.host, _Ctx.port), Handler)
