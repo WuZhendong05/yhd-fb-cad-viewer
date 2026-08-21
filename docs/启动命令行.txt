@@ -1,0 +1,4 @@
+cd /d D:\14418\step-viewer\viewer
+set "PATH=C:\Users\14418\.workbuddy\binaries\node\versions\22.22.2;%PATH%"
+set "VIEWER_CAD_PYTHON=C:\Users\14418\.workbuddy\binaries\python\envs\cadgen\Scripts\python.exe"
+npm run dev -- --host 127.0.0.1

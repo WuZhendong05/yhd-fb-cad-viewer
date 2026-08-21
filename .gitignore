@@ -1,0 +1,47 @@
+# ---- 构建产物 ----
+dist-*/
+dist/
+node_modules/
+
+# ---- Python ----
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+
+# ---- Python 构建产物 ----
+build/
+*.egg-info/
+
+# ---- 日志 ----
+*.log
+*.err
+
+# ---- 运行时数据（业务生成/上传）----
+uploads/
+__cadgen__/
+
+# ---- 密钥 / 环境变量 ----
+.env
+.env.local
+*.key
+*_api_key*
+
+# ---- IDE / 编辑器 ----
+.vscode/
+.idea/
+*.swp
+
+# ---- 操作系统 ----
+Thumbs.db
+Desktop.ini
+
+# ---- pytest ----
+.pytest_cache/
+
+# ---- Agent / 机器本地（不入库）----
+.workbuddy/
+
+# ---- CAD 样本与目录数据（真实零件，不入库）----
+samples/
+step/
