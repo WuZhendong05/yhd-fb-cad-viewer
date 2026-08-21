@@ -86,6 +86,29 @@ def _is_loopback_host(host: str) -> bool:
     return value == "127.0.0.1" or value.startswith("127.")
 
 
+# taskId == uploads/<taskId> directory name, produced by backend._new_task_id().
+_TASK_ID_RE = re.compile(r"^\d{8}_\d{6}_[0-9a-f]{6}$")
+
+
+def _resolve_task_dir(task_id: str) -> str:
+    """Deterministically map a taskId to its absolute uploads path.
+
+    Strictly validated (no arbitrary paths), resolved against the same uploads
+    root the upload API writes to (VIEWER_UPLOAD_ROOT, default <project>/uploads),
+    and must stay inside it. Raises ForbiddenAssetError on format/containment
+    violations and FileNotFoundError when the task directory does not exist.
+    """
+    if not _TASK_ID_RE.match(str(task_id or "")):
+        raise backend_mod.ForbiddenAssetError("Forbidden")
+    upload_root = os.path.abspath(backend_mod._link_upload_root())
+    candidate = os.path.abspath(os.path.join(upload_root, task_id))
+    if not (candidate == upload_root or backend_mod.scanner.path_is_inside(candidate, upload_root)):
+        raise backend_mod.ForbiddenAssetError("Forbidden")
+    if not os.path.isdir(candidate):
+        raise FileNotFoundError(f"task {task_id!r} not found")
+    return candidate
+
+
 def _server_info(root_dir: str = "") -> dict:
     return server_info_mod.build_viewer_server_info(
         root_dir=root_dir or "",
@@ -138,6 +161,14 @@ class Handler(BaseHTTPRequestHandler):
         q = parse_qs(parts.query)
         return parts.path, {k: (v[0] if v else "") for k, v in q.items()}
 
+    def _root_dir(self, q):
+        """The active directory for a request: from ?dir=, or resolved from ?task=
+        (taskId -> uploads/<taskId>, constrained to the uploads root)."""
+        task = q.get("task", "")
+        if task:
+            return _resolve_task_dir(task)
+        return q.get("dir", "")
+
     def log_message(self, *args):  # quieter
         pass
 
@@ -146,12 +177,15 @@ class Handler(BaseHTTPRequestHandler):
         path, q = self._query()
         try:
             if path == "/__cad/server":
-                self._send_json(200, _server_info(q.get("dir", "")))
+                self._send_json(200, _server_info(self._root_dir(q)))
+            elif path == "/__cad/resolve":
+                task = q.get("task", "")
+                self._send_json(200, {"task": task, "dir": _resolve_task_dir(task)})
             elif path == "/__cad/catalog":
-                catalog = _Ctx.backend.read_catalog(root_dir=q.get("dir", ""), file_ref=q.get("file", ""))
+                catalog = _Ctx.backend.read_catalog(root_dir=self._root_dir(q), file_ref=q.get("file", ""))
                 self._send_json(200, catalog)
             elif path == "/__cad/artifact":
-                root_dir = q.get("dir", "")
+                root_dir = self._root_dir(q)
                 catalog = _Ctx.backend.read_catalog(root_dir=root_dir, file_ref=q.get("file", ""))
                 resolved = _Ctx.backend.resolve_root(root_dir)
                 self._send_json(200, _Ctx.backend.artifact_status(q.get("file", ""), resolved, catalog))
@@ -330,7 +364,10 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             return
         file_ref = q.get("file", "")
-        root_dir = q.get("dir", "")
+        root_dir = self._root_dir(q)
+        if q.get("task", "") and file_ref and not os.path.isabs(file_ref):
+            # In task mode `file` is relative to the task directory.
+            file_ref = os.path.join(root_dir, file_ref)
         resolved = _Ctx.backend.resolve_root(root_dir) if root_dir else None
         candidate = _Ctx.backend.asset_path_for_file_ref(file_ref, resolved_root=resolved, root_dir=root_dir)
         if not candidate or not os.path.isfile(candidate):
@@ -345,7 +382,7 @@ class Handler(BaseHTTPRequestHandler):
         self._send_bytes(200, data, content_type, disposition=disposition)
 
     def _artifact_build(self, q):
-        root_dir = q.get("dir", "")
+        root_dir = self._root_dir(q)
         catalog = _Ctx.backend.read_catalog(root_dir=root_dir, file_ref=q.get("file", ""))
         resolved = _Ctx.backend.resolve_root(root_dir)
         result = _Ctx.backend.resolve_artifact(q.get("file", ""), q.get("force", "") == "1", resolved, catalog)
@@ -355,7 +392,7 @@ class Handler(BaseHTTPRequestHandler):
         self._send_json(status, {**result, "catalog": next_catalog})
 
     def _export(self, q):
-        root_dir = q.get("dir", "")
+        root_dir = self._root_dir(q)
         catalog = _Ctx.backend.read_catalog(root_dir=root_dir, file_ref=q.get("file", ""))
         resolved = _Ctx.backend.resolve_root(root_dir)
         result = _Ctx.backend.generate_export(q.get("file", ""), q.get("format", "step") or "step", resolved, catalog)

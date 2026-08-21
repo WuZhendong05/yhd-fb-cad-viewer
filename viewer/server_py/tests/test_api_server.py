@@ -132,8 +132,15 @@ class ApiServerTest(unittest.TestCase):
         self.assertEqual(result["taskId"], job_id)
         self.assertEqual(result["file"], "part.step")
         self.assertIn(job_id, result["viewerUrl"])
+        self.assertIn("?task=", result["viewerUrl"])
         self.assertIn("file=part.step", result["viewerUrl"])
         self.assertIn("features=", result["viewerUrl"])
+        # The share URL must NEVER contain an absolute local path (taskId-only).
+        self.assertIn("?task=", result["viewerUrl"])
+        self.assertNotIn("dir=", result["viewerUrl"])
+        rest = result["viewerUrl"].split("://", 1)[-1]  # after the scheme
+        self.assertNotRegex(rest, r"[A-Za-z]:[\\/]")  # no drive-letter path
+        self.assertNotIn("/D:/", result["viewerUrl"])
 
         task_dir = os.path.join(self._tmp.name, job_id)
         self.assertTrue(os.path.isdir(task_dir))

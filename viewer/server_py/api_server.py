@@ -58,11 +58,11 @@ if __package__ in (None, ""):
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from server_py import backend as backend_mod
     from server_py import server_info as server_info_mod
-    from server_py.encoding import compact_json
+    from server_py.encoding import compact_json, url_search_params_encode
 else:
     from . import backend as backend_mod
     from . import server_info as server_info_mod
-    from .encoding import compact_json
+    from .encoding import compact_json, url_search_params_encode
 
 DEFAULT_API_PORT = 8420
 DEFAULT_MAX_UPLOAD_BYTES = 100 * 1024 * 1024  # 100 MiB
@@ -246,6 +246,18 @@ def _validate_features_json(data: bytes) -> None:
         raise ValueError(f"invalid features JSON: {exc}") from exc
 
 
+def _task_viewer_url(task_id: str, file: str, features: str) -> str:
+    """Build the external share URL in TASK form: pathname stays neutral ("/") and
+    only the opaque taskId + relative file/features names appear. No absolute local
+    path ever reaches the address bar or a shared link."""
+    query = [("task", task_id)]
+    if file:
+        query.append(("file", file))
+    if features:
+        query.append(("features", features))
+    return f"http://{_viewer_authority()}/?" + url_search_params_encode(query)
+
+
 def _land_job(job_id: str, step_name: str, step_bytes: bytes, features_bytes: bytes | None) -> None:
     """Worker: perform the disk landing and update the job status."""
     try:
@@ -254,7 +266,7 @@ def _land_job(job_id: str, step_name: str, step_bytes: bytes, features_bytes: by
             host=_viewer_authority(), task_id=job_id,
         )
         _JOBS.set_landed(job_id, {
-            "viewerUrl": result["url"],
+            "viewerUrl": _task_viewer_url(job_id, result["file"], result["features"]),
             "taskId": result["taskId"],
             "dir": result["dir"],
             "file": result["file"],
