@@ -15,10 +15,12 @@ import time
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(SCRIPT_DIR)
 
-PY = os.environ.get(
-    "CAD_PYTHON",
-    r"C:/Users/14418/.workbuddy/binaries/python/envs/cadgen/Scripts/python.exe",
-)
+PY = os.environ.get("CAD_PYTHON", "").strip()
+if not PY:
+    raise SystemExit(
+        "CAD_PYTHON env var is required: path to a Python with OCP/build123d/cadgen "
+        "(e.g. the project CAD venv). Example: set CAD_PYTHON=C:/path/to/python.exe"
+    )
 STEP_ROOT = (
     os.environ.get("STEP_REPO_ROOT")
     or (sys.argv[1] if len(sys.argv) > 1 else "")

@@ -1,10 +1,27 @@
+// Verify an uploaded STEP renders (task-form URL) in a headless browser.
+//
+// Usage (no hardcoded paths — everything comes from the environment):
+//   VERIFY_URL="http://127.0.0.1:3245/?task=<taskId>&file=x.STEP&features=x.特征识别.json" \
+//     node verify_upload.mjs
+// Optional: VERIFY_LOG (default <repo>/verify_upload.log), VERIFY_SHOT (default <repo>/verify-upload.png).
 import { chromium } from "playwright";
 import { appendFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const LOG = "D:/14418/step-viewer/verify_upload.log";
-const log = (msg) => { appendFileSync(LOG, `${new Date().toISOString()} ${msg}\n`); console.log(msg); };
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const LOG = process.env.VERIFY_LOG || path.join(REPO_ROOT, "verify_upload.log");
+const SHOT = process.env.VERIFY_SHOT || path.join(REPO_ROOT, "verify-upload.png");
+const URL = process.env.VERIFY_URL || "";
+const log = (msg) => {
+  appendFileSync(LOG, `${new Date().toISOString()} ${msg}\n`);
+  console.log(msg);
+};
 
-const URL = "http://127.0.0.1:3245/D:/14418/step-viewer/uploads/20260820_145409_de0292?file=%E6%B5%8B%E8%AF%951.STEP&features=%E6%B5%8B%E8%AF%951.%E7%89%B9%E5%BE%81%E8%AF%86%E5%88%AB.json";
+if (!URL) {
+  log("FATAL: VERIFY_URL is required (task-form URL, e.g. ?task=<taskId>&file=... )");
+  process.exit(1);
+}
 
 try {
   const browser = await chromium.launch({ channel: "chrome", headless: true, args: ["--no-sandbox", "--disable-gpu"] });
@@ -46,7 +63,7 @@ try {
   });
   log("STATE: " + JSON.stringify(state, null, 1));
   log("ERRORS: " + JSON.stringify(errors));
-  await page.screenshot({ path: "D:/14418/step-viewer/verify-upload.png" });
+  await page.screenshot({ path: SHOT });
   await browser.close();
   log("done");
 } catch (err) {

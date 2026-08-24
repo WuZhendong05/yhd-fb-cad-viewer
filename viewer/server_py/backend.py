@@ -692,7 +692,9 @@ _LINK_UPLOAD_ENV = "VIEWER_UPLOAD_ROOT"
 # Default uploads root sits beside the viewer app root (the project root).
 _LINK_UPLOAD_PARENT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _PYTHONOCC_PYTHON_ENV = "VIEWER_PYTHONOCC_PYTHON"
-_PYTHONOCC_DEFAULT_PYTHON = r"D:\Anaconda\envs\gccad310\python.exe"
+# No machine-specific default: stepEntityId injection requires the operator to point
+# VIEWER_PYTHONOCC_PYTHON at a python with pythonocc-core. Empty disables it gracefully.
+_PYTHONOCC_DEFAULT_PYTHON = ""
 _FEATURES_SIDECAR_NAMES = ("特征识别.json", "特征.json", "feature.json")
 
 

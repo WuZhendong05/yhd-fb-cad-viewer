@@ -1,12 +1,14 @@
 import base64
 import json
+import os
 import sys
 import urllib.error
 import urllib.request
 
-BASE = "http://127.0.0.1:3245"
-STEP = r"D:\14418\step-viewer\samples\测试1.STEP"
-JSONF = r"D:\14418\step-viewer\samples\测试1特征识别.txt"
+BASE = os.environ.get("VIEWER_BASE", "http://127.0.0.1:3245")
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+STEP = os.path.join(_REPO, "samples", "测试1.STEP")
+JSONF = os.path.join(_REPO, "samples", "测试1特征识别.txt")
 
 step_b64 = base64.b64encode(open(STEP, "rb").read()).decode("ascii")
 feat = open(JSONF, encoding="utf-8").read()

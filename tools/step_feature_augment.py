@@ -8,7 +8,7 @@
 用法:
   python step_feature_augment.py --step <step文件> --glb <组件.glb> [--out <输出.glb>]
 
-依赖: pythonocc-core（如 D:\\Anaconda\\envs\\gccad310\\python.exe）
+依赖: pythonocc-core（安装示例: conda install -c conda-forge pythonocc-core，或 pip install pythonocc-core）
 """
 import argparse
 import json
