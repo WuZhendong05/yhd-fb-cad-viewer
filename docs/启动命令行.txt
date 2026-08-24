@@ -1,4 +1,0 @@
-cd /d <项目根>\viewer
-set "PATH=<你的 node 安装 bin 目录>;%PATH%"
-set "VIEWER_CAD_PYTHON=<CAD 环境 python.exe 路径，例如含 OCP/build123d/cadgen 的 venv>"
-npm run dev -- --host 127.0.0.1
